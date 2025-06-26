@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v3"
@@ -18,7 +17,7 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 	var network string
 
 	switch protocol {
-	case UDP:
+	case UDP:	
 		network = "udp"
 	case TCP:
 		network = "tcp"
@@ -37,31 +36,7 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 			continue
 		}
 
-		var wgClose sync.WaitGroup
-
-		wgClose.Add(2)
-
 		go func() {
-
-			defer wgClose.Done()
-
-			for {
-
-				_, err := io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
-				
-				if err != nil {
-					log.Println("Error writing data to connection:", err)
-					conn.Close()
-					return
-				}
-
-			}
-
-		}()
-
-		go func() {
-
-			defer wgClose.Done()
 
 			buf := make([]byte, 65507) // Maximum UDP packet size
 			for {
@@ -69,7 +44,6 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 				
 				if err != nil {
 					log.Println("Error reading from connection:", err)
-					// conn.Close()
 					return
 				}
 				
@@ -84,7 +58,14 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 			}
 		}()
 
-		wgClose.Wait() // Wait for both goroutines to finish
+		_, err = io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
+		if err != nil {
+			log.Println("Error writing data to connection:", err)
+		}
+
+		time.Sleep(20 * time.Millisecond) // Wait before reconnecting
+
+		log.Println("Reconnecting to host...")
 
 	}
 	

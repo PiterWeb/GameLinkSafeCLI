@@ -41,25 +41,12 @@ func serveThroughClient(protocol, port uint, proxyPipeReader *io.PipeReader, exi
 		}
 
 		go func() {
-
-			for  {
-				_, err = io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
-				if err != nil {
-					log.Println("Error writing data to connection:", err)
-					conn.Close()
-					return
-				}
-			}
-		}()
-
-		go func() {
 			buf := make([]byte, 65507) // Maximum UDP packet size
 			for {
 				n, err := conn.Read(buf)
 
 				if err != nil {
 					log.Println("Error reading from connection:", err)
-					conn.Close()
 					return
 				}
 
@@ -70,7 +57,11 @@ func serveThroughClient(protocol, port uint, proxyPipeReader *io.PipeReader, exi
 			}
 		}()
 
-	}
+		_, err = io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
+		if err != nil {
+			log.Println("Error writing data to connection:", err)
+		}
 
+	}
 
 }
