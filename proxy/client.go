@@ -2,13 +2,14 @@ package proxy
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 
 	"github.com/pion/webrtc/v3"
 )
 
-func serveThroughClient(protocol, port uint, entryChannel <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
+func serveThroughClient(protocol, port uint, proxyPipeReader *io.PipeReader, exitDataChannel *webrtc.DataChannel) error {
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
@@ -41,13 +42,12 @@ func serveThroughClient(protocol, port uint, entryChannel <-chan []byte, exitDat
 
 		go func() {
 
-			for buf := range entryChannel {
-
-				_, err = conn.Write(buf)
+			for  {
+				_, err = io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
 				if err != nil {
-					log.Println("Error writing to connection:", err)
+					log.Println("Error writing data to connection:", err)
 					conn.Close()
-					break
+					return
 				}
 			}
 		}()
@@ -55,20 +55,22 @@ func serveThroughClient(protocol, port uint, entryChannel <-chan []byte, exitDat
 		go func() {
 			buf := make([]byte, 65507) // Maximum UDP packet size
 			for {
-				_, err := conn.Read(buf)
+				n, err := conn.Read(buf)
 
 				if err != nil {
 					log.Println("Error reading from connection:", err)
 					conn.Close()
-					break
+					return
 				}
 
-				exitDataChannel.Send(buf)
+				data := make([]byte, n)
+				copy(data, buf[:n])
+
+				exitDataChannel.Send(data)
 			}
 		}()
 
 	}
 
-	return nil
 
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc/signal"
+	"io"
 	"log"
 	"strings"
 
@@ -41,26 +42,22 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 			return
 		}
 
-		proxyChannelEntry := make(chan []byte)
+		proxyPipeReader, proxyPipeWriter := io.Pipe()
 
 		d.OnOpen(func() {
 
-			go func () {
-				switch finalProtocol {
-				case proxy.UDP:
-					_ = proxy.ServeThroughUDP(destinationPort, proxyChannelEntry, d)
-				case proxy.TCP:
-					_ = proxy.ServeThroughTCP(destinationPort, proxyChannelEntry, d)
-				}
-			}()
+			switch finalProtocol {
+			case proxy.UDP:
+				_ = proxy.ServeThroughUDP(destinationPort, proxyPipeReader, d)
+			case proxy.TCP:
+				_ = proxy.ServeThroughTCP(destinationPort, proxyPipeReader, d)
+			}
 
 		})
 
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
 
-			go func() {
-				proxyChannelEntry <- msg.Data
-			}()
+			proxyPipeWriter.Write(msg.Data)
 
 		})
 
