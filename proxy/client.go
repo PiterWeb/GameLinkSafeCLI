@@ -26,7 +26,6 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 
 	var pipeCountMutex sync.Mutex
 	pipeArr := make([]dataPipe, 255)
-	mapAddrId := make(map[string]uint8, 255)
 	log.Println("Initialized pipe array with size:", len(pipeArr))
 	pipeCount := uint8(0)
 
@@ -65,57 +64,56 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 
 	for {
 		buf := make([]byte, 65507) // Maximum UDP packet size
+
+		pipeCountMutex.Lock()
+		id := pipeCount
+		pipeCountMutex.Unlock()
+
+		pipeArr[id].reader, pipeArr[id].writer = io.Pipe()
+		log.Printf("Created new pipe for ID(%d)\n", id)
+
+		pipeCountMutex.Lock()
+		pipeCount++
+		log.Println("Incremented pipe count to:", pipeCount)
+		if pipeCount >= uint8(len(pipeArr)) {
+			pipeCount = 0 // Reset pipe count if it exceeds the array length
+		}
+		pipeCountMutex.Unlock()
+
 		n, addr, err := listener.ReadFrom(buf)
 
 		if err != nil {
-			log.Println("Error reading from listener:", err)
+			log.Println("Error reading from connection:", err)
+			log.Printf("Closing pipe for ID(%d)\n", id)
+			pipeArr[id].writer.Close()
 			continue
 		}
 
-		
+		go func(id uint8) {
+			log.Printf("Read %d bytes from tcp connection for ID(%d)\n", n, id)
 
-		go func(buf []byte, n int, addr net.Addr) {
-			log.Printf("Received %d bytes from UDP listener for address %s\n", n, addr.String())
+			data := make([]byte, n)
+			copy(data, buf[:n])
 
-			
-			id, exists := mapAddrId[addr.String()]
-			
-			if !exists {
-				pipeCountMutex.Lock()
-				id = pipeCount
-				pipeCountMutex.Unlock()
+			data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
 
-				pipeArr[id].reader, pipeArr[id].writer = io.Pipe()
-				log.Printf("Created new pipe for ID(%d)\n", id)
+			log.Printf("Sending data through WebRTC for ID(%d)\n", id)
+			exitDataChannel.Send(data)
+		}(id)
 
-				pipeCountMutex.Lock()
-				pipeCount++
-				log.Println("Incremented pipe count to:", pipeCount)
-				if pipeCount >= uint8(len(pipeArr)) {
-					pipeCount = 0 // Reset pipe count if it exceeds the array length
-				}
-				pipeCountMutex.Unlock()
+		go func(id uint8, addr net.Addr) {
 
-			}
-
-			log.Printf("Read %d bytes from UDP listener\n", n)
-			
 			data, err := io.ReadAll(pipeArr[id].reader) // Read all data from the pipe to ensure it is consumed
+
 			if err != nil {
 				log.Println("Error writing data to connection:", err)
 			}
 
-			n, err = listener.WriteTo(data, addr) // Write data to the UDP connection
+			n, err := listener.WriteTo(data, addr)
 
 			log.Printf("Finished writing %d bytes to connection for ID(%d)\n", n, id)
-			
-			if err != nil {
-				log.Printf("Error writing data to connection for ID(%d): %v\n", id, err)
-				return
-			}
-			
+		}(id, addr)
 
-		}(buf, n, addr)
 	}
 }
 

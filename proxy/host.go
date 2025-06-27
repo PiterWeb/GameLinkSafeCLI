@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/pion/webrtc/v3"
 )
@@ -23,6 +24,7 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 		return fmt.Errorf("invalid protocol")
 	}
 
+	var netConnMapMutex sync.Mutex // Mutex to protect access to netConnMap
 	netConnMap := make(map[uint8]net.Conn, 255)
 
 	for data := range proxyChan {
@@ -31,7 +33,9 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 
 		log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
+		netConnMapMutex.Lock() // Lock the map for safe concurrent access
 		conn, exists := netConnMap[id]
+		netConnMapMutex.Unlock() // Unlock the map after checking
 
 		if !exists {
 			
@@ -41,12 +45,16 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 			if err != nil {
 				log.Println("Error connecting to host:", err)
 				log.Printf("Closing connection for ID(%d)\n", id)
+				netConnMapMutex.Lock() // Lock the map for safe concurrent access
 				delete(netConnMap, id) // Remove the connection from the map
+				netConnMapMutex.Unlock() // Unlock the map after deleting
 				endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 				continue
 			}
 
+			netConnMapMutex.Lock() // Lock the map for safe concurrent access
 			netConnMap[id] = conn // Store the connection in the map
+			netConnMapMutex.Unlock() // Unlock the map after storing
 
 			log.Printf("Established new connection for ID(%d)\n", id)
 
@@ -64,7 +72,9 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 					if err != nil {
 						log.Println("Error reading from connection:", err)
 						log.Printf("Closing connection for ID(%d)", id)
+						netConnMapMutex.Lock() // Lock the map for safe concurrent access
 						delete(netConnMap, id) // Remove the connection from the map
+						netConnMapMutex.Unlock() // Unlock the map after deleting
 						endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 						return
 					}
@@ -92,7 +102,9 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 		if err != nil {
 			log.Println("Error writing data to connection:", err)
 			log.Printf("Closing connection for ID(%d)\n", id)
+			netConnMapMutex.Lock() // Lock the map for safe concurrent access
 			delete(netConnMap, id) // Remove the connection from the map
+			netConnMapMutex.Unlock() // Unlock the map after deleting
 			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 			continue
 		}
