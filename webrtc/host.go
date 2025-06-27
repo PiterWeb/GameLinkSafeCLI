@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc/signal"
-	"io"
 	"log"
 	"strings"
 
@@ -35,6 +34,12 @@ func HostWebrtc(port uint, protocol uint) error {
 		close(triggerEnd)
 	}()
 
+	endConnChannel, err := peerConnection.CreateDataChannel("endConn", &webrtc.DataChannelInit{})
+
+	if err != nil {
+		return err
+	}
+
 	ordered := true
 
 	// If the protocol is UDP, we need to set the data channel to unordered
@@ -50,23 +55,23 @@ func HostWebrtc(port uint, protocol uint) error {
 		return err
 	}
 
-	proxyPipeReader, proxyPipeWriter := io.Pipe()
+	proxyChan := make(chan []byte)
 
 	// Open the data channel and select the protocol to send data
 	dataChannel.OnOpen(func() {
 
 		switch protocol {
 		case proxy.UDP:
-			_ = proxy.SendThroughUDP(port, proxyPipeReader, dataChannel)
+			_ = proxy.SendThroughUDP(port, proxyChan, dataChannel, endConnChannel)
 		case proxy.TCP:
-			_ = proxy.SendThroughTCP(port, proxyPipeReader, dataChannel)
+			_ = proxy.SendThroughTCP(port, proxyChan, dataChannel, endConnChannel)
 		}
 
 	})
 
 	// Listen for messages on the data channel to send to the proxy channel
 	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) { 
-			proxyPipeWriter.Write(msg.Data)
+		proxyChan <- msg.Data
 	})
 
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {

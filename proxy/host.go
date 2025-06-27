@@ -2,15 +2,13 @@ package proxy
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"time"
 
 	"github.com/pion/webrtc/v3"
 )
 
-func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDataChannel *webrtc.DataChannel) error {
+func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel, endConnChannel *webrtc.DataChannel) error {
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
@@ -25,30 +23,65 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 		return fmt.Errorf("invalid protocol")
 	}
 
-	for {
+	netConnMap := make(map[uint8]net.Conn, 255)
 
-		conn, err := net.Dial(network, addr)
+	for data := range proxyChan {
 
+		id := data[0] // Assuming the first byte is the ID
+
+		log.Printf("Received data for ID(%d) with len: %d \n", id, len(data)-1)
+
+		conn, exists := netConnMap[id]
+
+		if exists {
+			
+			log.Printf("Using existing connection for ID(%d)\n", id)
+			n, err := conn.Write(data[1:]) // Write data excluding the ID byte
+			if err != nil {
+				log.Println("Error writing data to connection:", err)
+			}
+
+			log.Printf("Wrote %d bytes to connection for ID(%d)\n", n, id)
+
+			delete(netConnMap, id) // Remove the connection from the map
+			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+			continue
+
+		}
+
+		var err error
+		conn, err = net.Dial(network, addr)
 		if err != nil {
 			log.Println("Error connecting to host:", err)
-			log.Println("Reconnecting in 20 milliseconds...")
-			time.Sleep(20 * time.Millisecond) // Wait before reconnecting
+			log.Println("Closing connection for ID:", id)
+			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 			continue
 		}
 
-		go func() {
+		log.Println("Established new connection for ID:", id)
 
+		netConnMap[id] = conn // Store the connection in the map
+	
+		go func() {
 			buf := make([]byte, 65507) // Maximum UDP packet size
 			for {
 				n, err := conn.Read(buf)
 				
 				if err != nil {
 					log.Println("Error reading from connection:", err)
+					log.Println("Closing connection for ID:", id)
+					delete(netConnMap, id) // Remove the connection from the map
+					endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 					return
 				}
 				
+				// Save buffered data to a new slice
 				data := make([]byte, n)
 				copy(data, buf[:n])
+
+				data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
+
+				log.Println("Sending data through webrtc for ID:", id)
 				err = exitDataChannel.Send(data)
 				
 				if err != nil {
@@ -58,15 +91,8 @@ func sendThroughHost(protocol, port uint, proxyPipeReader *io.PipeReader, exitDa
 			}
 		}()
 
-		_, err = io.Copy(conn, proxyPipeReader) // Copy data from the pipe to the connection
-		if err != nil {
-			log.Println("Error writing data to connection:", err)
-		}
-
-		time.Sleep(20 * time.Millisecond) // Wait before reconnecting
-
-		log.Println("Reconnecting to host...")
-
 	}
-	
+
+	return nil
+
 }

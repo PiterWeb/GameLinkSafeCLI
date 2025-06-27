@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc/signal"
-	"io"
 	"log"
 	"strings"
 
@@ -35,31 +34,13 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 		close(triggerEnd)
 	}()
 
+	endConnChan := make(chan uint8)
+
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 
-		if d.Label() != "data" {
-			return
-		}
-
-		proxyPipeReader, proxyPipeWriter := io.Pipe()
-
-		d.OnOpen(func() {
-
-			switch finalProtocol {
-			case proxy.UDP:
-				_ = proxy.ServeThroughUDP(destinationPort, proxyPipeReader, d)
-			case proxy.TCP:
-				_ = proxy.ServeThroughTCP(destinationPort, proxyPipeReader, d)
-			}
-
-		})
-
-		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-
-			proxyPipeWriter.Write(msg.Data)
-
-		})
+		handleDataChannel(destinationPort, finalProtocol, endConnChan,d)
+		handleEndConnChannel(d, endConnChan)
 
 	})
 
@@ -134,4 +115,43 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 	<-triggerEnd
 
 	return nil
+}
+
+func handleDataChannel(destinationPort uint, finalProtocol uint, endConnChan <-chan uint8, d *webrtc.DataChannel) {
+
+	if d.Label() != "data" {
+		return
+	}
+
+	proxyChan := make(chan []byte)
+
+	d.OnOpen(func() {
+
+		switch finalProtocol {
+		case proxy.UDP:
+			_ = proxy.ServeThroughUDP(destinationPort, proxyChan, endConnChan, d)
+		case proxy.TCP:
+			_ = proxy.ServeThroughTCP(destinationPort, proxyChan, endConnChan, d)
+		}
+
+	})
+
+	d.OnMessage(func(msg webrtc.DataChannelMessage) {
+
+		proxyChan <- msg.Data
+
+	})
+
+}
+
+func handleEndConnChannel(d *webrtc.DataChannel, endConnChan chan<- uint8) {
+
+	if d.Label() != "endConn" {
+		return
+	}
+
+	d.OnMessage(func(msg webrtc.DataChannelMessage) {
+		endConnChan <- msg.Data[0]
+	})
+
 }
