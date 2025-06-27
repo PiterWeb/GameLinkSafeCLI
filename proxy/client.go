@@ -46,11 +46,6 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 			id := data[0]
 			log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
-			if pipeArr[id].reader == nil || pipeArr[id].writer == nil {
-				log.Printf("No pipe found for ID(%d), skipping data write\n", id)
-				continue
-			}
-
 			n, err := pipeArr[id].writer.Write(data[1:])
 		
 			if err != nil {
@@ -151,11 +146,6 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 						
 			id := data[0]
 			log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
-
-			if pipeArr[id].reader == nil || pipeArr[id].writer == nil {
-				log.Printf("No pipe found for ID(%d), skipping data write\n", id)
-				continue
-			}
 
 			n, err := pipeArr[id].writer.Write(data[1:])
 		
