@@ -13,6 +13,7 @@ import (
 func HostWebrtc(port uint, protocol uint) error {
 
 	triggerEnd := make(chan error)
+	defer close(triggerEnd)
 
 	candidates := []webrtc.ICECandidateInit{}
 
@@ -56,6 +57,7 @@ func HostWebrtc(port uint, protocol uint) error {
 	}
 
 	proxyChan := make(chan []byte)
+	defer close(proxyChan)
 
 	// Open the data channel and select the protocol to send data
 	dataChannel.OnOpen(func() {
@@ -77,8 +79,9 @@ func HostWebrtc(port uint, protocol uint) error {
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 
 		if c == nil {
-			fmt.Println("Copy the following line and paste it in the host process to connect:")
+			fmt.Println("--- Copy the following line and paste it in the client process to connect ---")
 			fmt.Println(signal.SignalEncode(*peerConnection.LocalDescription()) + ";" + signal.SignalEncode(candidates))
+			fmt.Println("--- Waiting for the client code ---")
 			return
 		}
 
@@ -109,8 +112,6 @@ func HostWebrtc(port uint, protocol uint) error {
 		return err
 	}
 
-	fmt.Println("Waiting for the client code:")
-
 	var answerResponse string
 	_, err = fmt.Scanln(&answerResponse)
 
@@ -136,7 +137,7 @@ func HostWebrtc(port uint, protocol uint) error {
 		err := peerConnection.AddICECandidate(candidate)
 
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("failed to add ICE candidate: %w", err)
 		}
 	}
 

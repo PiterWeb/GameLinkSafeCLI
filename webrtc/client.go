@@ -36,6 +36,8 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 
 	endConnChan := make(chan uint8)
 
+	defer close(endConnChan)
+
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 
@@ -47,7 +49,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 
 		if c == nil {
-			fmt.Println("Copy the following line and paste it in the host process to connect:")
+			fmt.Println("--- Copy the following line and paste it in the host process to connect ---")
 			fmt.Println(signal.SignalEncode(*peerConnection.LocalDescription()) + ";" + signal.SignalEncode(candidates))
 			return
 		}
@@ -69,7 +71,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 		}
 	})
 
-	fmt.Println("Waiting for the host code:")
+	fmt.Println("--- Waiting for the host code ---")
 
 	var offerEncodedWithCandidates string
 
@@ -89,7 +91,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 	_ = signal.SignalDecode(offerEncodedWithCandidatesSplited[1], &receivedCandidates)
 
 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
-		panic(err)
+		return fmt.Errorf("failed to set remote description: %w", err)
 	}
 
 	for _, candidate := range receivedCandidates {
@@ -102,16 +104,16 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 	// Create an answer to send to the other process
 	answer, err := peerConnection.CreateAnswer(nil)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create answer: %w", err)
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to set local description: %w", err)
 	}
 
-	// Block until cancel by user
+	// Block until error is received or the connection is closed
 	<-triggerEnd
 
 	return nil

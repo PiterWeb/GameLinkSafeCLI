@@ -11,5 +11,5 @@ func SendThroughUDP(port uint, proxyChan <-chan []byte, exitChannel *webrtc.Data
 
 // ServeThroughUDP serves as a UDP server (used for client logic)
 func ServeThroughUDP(port uint, proxyChan <-chan []byte, endConnChan <-chan uint8, exitChannel *webrtc.DataChannel) error {
-	return serveThroughClient(UDP, port, proxyChan, endConnChan, exitChannel)
+	return serveThroughClientUDP(port, proxyChan, endConnChan, exitChannel)
 }

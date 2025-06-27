@@ -11,5 +11,5 @@ func SendThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.
 
 // ServeThroughTCP serves as a TCP server (used for client logic)
 func ServeThroughTCP(port uint, proxyChan <-chan []byte, endConnChan <-chan uint8, exitDataChannel *webrtc.DataChannel) error {
-	return serveThroughClient(TCP, port, proxyChan, endConnChan, exitDataChannel)
+	return serveThroughClientTCP(port, proxyChan, endConnChan, exitDataChannel)
 }

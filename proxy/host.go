@@ -51,12 +51,6 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 			log.Printf("Established new connection for ID(%d)\n", id)
 
 		}
-
-		// log.Printf("Closing connection for ID(%d)\n", id)
-		// delete(netConnMap, id) // Remove the connection from the map
-		// endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
-		// conn.Close()
-		// continue
 	
 		// Only start reading from the connection if it doesn't already exist
 		// This prevents multiple goroutines from reading from the same connection

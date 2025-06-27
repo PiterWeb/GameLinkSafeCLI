@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc"
+	"log"
 )
 
 const (
@@ -57,7 +58,7 @@ func main() {
 		err := webrtc.ClientWebrtc(port, protocolEnum)
 
 		if err != nil {
-			fmt.Printf("Error starting WebRTC client: %v\n", err)
+			log.Printf("Error starting WebRTC client: %v\n", err)
 			return
 		}
 
@@ -69,7 +70,7 @@ func main() {
 		err := webrtc.HostWebrtc(port, protocolEnum)
 
 		if err != nil {
-			fmt.Printf("Error starting WebRTC host: %v\n", err)
+			log.Printf("Error starting WebRTC host: %v\n", err)
 			return
 		}
 	}
