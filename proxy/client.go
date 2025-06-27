@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/pion/webrtc/v3"
 )
@@ -40,8 +41,11 @@ func serveThroughClient(protocol, port uint, proxyChan <-chan []byte, endConnCha
 
 	go func() {
 		for id := range endConnChan {
-			log.Printf("Received end connection signal for ID(%d)\n", id)
-			pipeArr[id].writer.Close() // Close the writer to signal end of connection
+			go func(id uint8) {
+				log.Printf("Received end connection signal for ID(%d)\n", id)
+				time.Sleep(1 * time.Second) // Wait for 1 second before closing the pipe
+				pipeArr[id].writer.Close() // Close the writer to signal end of connection
+			}(id)
 		}
 	}()
 
@@ -49,7 +53,7 @@ func serveThroughClient(protocol, port uint, proxyChan <-chan []byte, endConnCha
 		for data := range proxyChan {
 						
 			id := data[0]
-			log.Printf("Received data for ID(%d) with len: %d \n", id, len(data)-1)
+			log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
 			if pipeArr[id].reader == nil || pipeArr[id].writer == nil {
 				log.Printf("No pipe found for ID(%d), skipping data write\n", id)

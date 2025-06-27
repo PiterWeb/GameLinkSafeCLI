@@ -29,70 +29,84 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 
 		id := data[0] // Assuming the first byte is the ID
 
-		log.Printf("Received data for ID(%d) with len: %d \n", id, len(data)-1)
+		log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
 		conn, exists := netConnMap[id]
 
-		if exists {
+		if !exists {
 			
-			log.Printf("Using existing connection for ID(%d)\n", id)
-			n, err := conn.Write(data[1:]) // Write data excluding the ID byte
+			var err error
+
+			conn, err = net.Dial(network, addr)
 			if err != nil {
-				log.Println("Error writing data to connection:", err)
+				log.Println("Error connecting to host:", err)
+				log.Printf("Closing connection for ID(%d)\n", id)
+				delete(netConnMap, id) // Remove the connection from the map
+				endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+				continue
 			}
 
-			log.Printf("Wrote %d bytes to connection for ID(%d)\n", n, id)
+			netConnMap[id] = conn // Store the connection in the map
 
+			log.Printf("Established new connection for ID(%d)\n", id)
+
+		}
+
+		// log.Printf("Closing connection for ID(%d)\n", id)
+		// delete(netConnMap, id) // Remove the connection from the map
+		// endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+		// conn.Close()
+		// continue
+	
+		// Only start reading from the connection if it doesn't already exist
+		// This prevents multiple goroutines from reading from the same connection
+		// and ensures that we only read once per connection
+		if !exists {
+			go func() {
+				buf := make([]byte, 65507) // Maximum UDP packet size
+				for {
+					n, err := conn.Read(buf)
+					
+					if err != nil {
+						log.Println("Error reading from connection:", err)
+						log.Printf("Closing connection for ID(%d)", id)
+						delete(netConnMap, id) // Remove the connection from the map
+						endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+						return
+					}
+					
+					log.Printf("Read %d bytes from connection for ID(%d)\n", n, id)
+					
+					// Save buffered data to a new slice
+					data := make([]byte, n)
+					copy(data, buf[:n])
+					
+					data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
+					
+					log.Println("Sending data through webrtc for ID:", id)
+					err = exitDataChannel.Send(data)
+					
+					if err != nil {
+						log.Println("Error sending data through webrtc:", err)
+					}
+				
+				}
+			}()
+		}
+
+		n, err := conn.Write(data[1:]) // Write data excluding the ID byte
+		if err != nil {
+			log.Println("Error writing data to connection:", err)
+			log.Printf("Closing connection for ID(%d)\n", id)
 			delete(netConnMap, id) // Remove the connection from the map
 			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 			continue
-
 		}
-
-		var err error
-		conn, err = net.Dial(network, addr)
-		if err != nil {
-			log.Println("Error connecting to host:", err)
-			log.Println("Closing connection for ID:", id)
-			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
-			continue
-		}
-
-		log.Println("Established new connection for ID:", id)
-
-		netConnMap[id] = conn // Store the connection in the map
-	
-		go func() {
-			buf := make([]byte, 65507) // Maximum UDP packet size
-			for {
-				n, err := conn.Read(buf)
-				
-				if err != nil {
-					log.Println("Error reading from connection:", err)
-					log.Println("Closing connection for ID:", id)
-					delete(netConnMap, id) // Remove the connection from the map
-					endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
-					return
-				}
-				
-				// Save buffered data to a new slice
-				data := make([]byte, n)
-				copy(data, buf[:n])
-
-				data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
-
-				log.Println("Sending data through webrtc for ID:", id)
-				err = exitDataChannel.Send(data)
-				
-				if err != nil {
-					log.Println("Error sending data through webrtc:", err)
-				}
-			
-			}
-		}()
-
+		
+		log.Printf("Wrote %d bytes to connection for ID(%d)\n", n, id)
+		
 	}
-
+	
 	return nil
-
+	
 }
