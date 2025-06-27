@@ -3,6 +3,7 @@ package proxy
 import (
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"sync"
 
@@ -25,7 +26,7 @@ func sendThroughHost(protocol, port uint, proxyChan <-chan []byte, exitDataChann
 	}
 
 	var netConnMapMutex sync.Mutex // Mutex to protect access to netConnMap
-	netConnMap := make(map[uint8]net.Conn, 255)
+	netConnMap := make(map[uint8]net.Conn, math.MaxUint8)
 
 	for data := range proxyChan {
 

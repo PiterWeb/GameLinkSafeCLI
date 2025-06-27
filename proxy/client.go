@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -25,7 +26,7 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 	defer listener.Close()
 
 	var pipeCountMutex sync.Mutex
-	pipeArr := make([]dataPipe, 255)
+	pipeArr := make([]dataPipe, math.MaxUint8)
 	log.Println("Initialized pipe array with size:", len(pipeArr))
 	pipeCount := uint8(0)
 
@@ -131,7 +132,7 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 	defer listener.Close()
 
 	var pipeCountMutex sync.Mutex
-	pipeArr := make([]dataPipe, 255)
+	pipeArr := make([]dataPipe, math.MaxUint8)
 	log.Println("Initialized pipe array with size:", len(pipeArr))
 	pipeCount := uint8(0)
 
