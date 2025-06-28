@@ -35,14 +35,14 @@ func main() {
 		return
 	}
 
-	fmt.Println("Starting proxy with the following configuration:")
-	fmt.Printf("Port: %d\n", port)
-	fmt.Printf("Protocol: %s\n", protocol)
-
 	if rol != "host" && rol != "client" {
 		fmt.Println("Error: Role must be either 'host' or 'client'")
 		return
 	}
+	
+	fmt.Println("Starting proxy with the following configuration:")
+	fmt.Printf("Port: %d\n", port)
+	fmt.Printf("Protocol: %s\n", protocol)
 
 	var protocolEnum uint
 
