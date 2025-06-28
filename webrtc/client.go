@@ -17,11 +17,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint) error {
 	candidates := []webrtc.ICECandidateInit{}
 
 	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19305", "stun:stun.l.google.com:19302", "stun:stun.ipfire.org:3478"},
-			},
-		},
+		ICEServers: defaultIceServers,
 	}
 
 	peerConnection, err := webrtc.NewPeerConnection(config)
