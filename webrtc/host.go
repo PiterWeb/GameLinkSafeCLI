@@ -10,7 +10,7 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-func HostWebrtc(port uint, protocol uint) error {
+func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 
 	triggerEnd := make(chan error)
 	defer close(triggerEnd)
@@ -20,7 +20,11 @@ func HostWebrtc(port uint, protocol uint) error {
 	config := webrtc.Configuration{
 		ICEServers: defaultIceServers,
 	}
-
+	
+	if len(iceServers) > 0 {
+		config.ICEServers = iceServers
+	}
+	
 	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		return err
