@@ -9,13 +9,9 @@ iceServers:
   #     - turn:turn.example.com:3478
   #   username: user1
   #   credential: pass1
-  #   transport: udp
-  #   description: Primary TURN server with UDP transport
 
   # # TURN server with TCP transport
   # - urls:
   #     - turn:turn.example.com:3478?transport=tcp
   #   username: user2
   #   credential: pass2
-  #   transport: tcp
-  #   description: Backup TURN server with TCP transport
