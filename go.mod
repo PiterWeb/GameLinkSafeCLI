@@ -2,7 +2,10 @@ module gamelinksafecli
 
 go 1.24.2
 
-require github.com/pion/webrtc/v3 v3.3.5
+require (
+	github.com/pion/webrtc/v3 v3.3.5
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -28,5 +31,4 @@ require (
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
