@@ -6,8 +6,10 @@ import (
 	"gamelinksafecli/config"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc"
+	"io"
 	"io/fs"
 	"log"
+	"os"
 )
 
 const (
@@ -17,10 +19,16 @@ const (
 
 func main() {
 
+	log.SetOutput(io.Discard)
+	
 	rolPtr := flag.String("role", "host", "Role of the application (host/client)")
 	portPtr := flag.Uint("port", defaultPort, "Port to listen on")
 	protocolPtr := flag.String("protocol", defaultProtocol, "Protocol to use (tcp/udp)")
 	configFilePtr := flag.String("config", "servers.yml", "Path to the config file for STUN/TURN urls and credentials")
+	flag.BoolFunc("verbose", "Enables logging in stdout", func(string) error {
+		log.SetOutput(os.Stdout)
+		return nil
+	})
 	
 	flag.Parse()
 

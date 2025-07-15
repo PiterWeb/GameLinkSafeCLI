@@ -63,6 +63,10 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
 		log.Printf("Peer Connection State has changed: %s\n", s.String())
 
+		if s == webrtc.PeerConnectionStateConnected {
+			fmt.Println("--- Connection stablished successfully ---")
+		}
+		
 		if s == webrtc.PeerConnectionStateFailed {
 
 			peerConnection.Close()
