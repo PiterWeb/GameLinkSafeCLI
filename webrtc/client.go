@@ -135,7 +135,7 @@ func handleDataChannel(destinationPort uint, finalProtocol uint, endConnChan <-c
 
 		switch finalProtocol {
 		case proxy.UDP:
-			_ = proxy.ServeThroughUDP(destinationPort, proxyChan, endConnChan, d)
+			_ = proxy.ServeThroughUDP(destinationPort, proxyChan, d)
 		case proxy.TCP:
 			_ = proxy.ServeThroughTCP(destinationPort, proxyChan, endConnChan, d)
 		}

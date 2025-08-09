@@ -64,7 +64,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 
 		switch protocol {
 		case proxy.UDP:
-			_ = proxy.SendThroughUDP(port, proxyChan, dataChannel, endConnChannel)
+			_ = proxy.SendThroughUDP(port, proxyChan, dataChannel)
 		case proxy.TCP:
 			_ = proxy.SendThroughTCP(port, proxyChan, dataChannel, endConnChannel)
 		}

@@ -12,12 +12,15 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-chan uint8, exitDataChannel *webrtc.DataChannel) error {
+func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
 
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	addr := net.UDPAddr{
+		IP: net.ParseIP("127.0.0.1"),
+		Port: int(port),
+	}
 
-	listener, err := net.ListenPacket("udp", addr)
-	
+	listener, err := net.ListenUDP("udp", &addr)
+
 	if err != nil {
 		log.Println("Error starting listener:", err)
 		return err
@@ -25,35 +28,21 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 
 	defer listener.Close()
 
-	var pipeCountMutex sync.Mutex
-	pipeArr := make([]dataPipe, math.MaxUint8)
-	log.Println("Initialized pipe array with size:", len(pipeArr))
-	pipeCount := uint8(0)
+	pipeReader, pipeWriter := io.Pipe()
 
 	go func() {
-		for id := range endConnChan {
-			go func(id uint8) {
-				log.Printf("Received end connection signal for ID(%d)\n", id)
-				time.Sleep(1 * time.Second) // Wait for 1 second before closing the pipe
-				pipeArr[id].writer.Close() // Close the writer to signal end of connection
-			}(id)
-		}
-	}()
-
-	go func () {
 		for data := range proxyChan {
-						
-			id := data[0]
-			log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
-			n, err := pipeArr[id].writer.Write(data[1:])
-		
+			log.Printf("Received data from WebRTC with len: %d \n", len(data))
+
+			n, err := pipeWriter.Write(data)
+
 			if err != nil {
-				log.Printf("Error writing to pipe with ID(%d): %v\n", id, err)
+				log.Printf("Error writing to pipe: %v\n", err)
 				continue
 			}
 
-			log.Printf("Wrote %d bytes to pipe for ID(%d)\n", n, id)
+			log.Printf("Wrote %d bytes to pipe\n", n)
 
 		}
 	}()
@@ -61,54 +50,37 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 	for {
 		buf := make([]byte, 65507) // Maximum UDP packet size
 
-		pipeCountMutex.Lock()
-		id := pipeCount
-		pipeCountMutex.Unlock()
-
-		pipeArr[id].reader, pipeArr[id].writer = io.Pipe()
-		log.Printf("Created new pipe for ID(%d)\n", id)
-
-		pipeCountMutex.Lock()
-		pipeCount++
-		log.Println("Incremented pipe count to:", pipeCount)
-		if pipeCount >= uint8(len(pipeArr)) {
-			pipeCount = 0 // Reset pipe count if it exceeds the array length
-		}
-		pipeCountMutex.Unlock()
-
-		n, addr, err := listener.ReadFrom(buf)
+		n, remoteAddr, err := listener.ReadFrom(buf)
 
 		if err != nil {
 			log.Println("Error reading from connection:", err)
-			log.Printf("Closing pipe for ID(%d)\n", id)
-			pipeArr[id].writer.Close()
+			pipeWriter.Close()
 			continue
 		}
 
-		go func(id uint8) {
-			log.Printf("Read %d bytes from tcp connection for ID(%d)\n", n, id)
+		log.Printf("Read %d bytes from udp connection\n", n)
+		exitDataChannel.Send(buf[:n])
 
-			data := make([]byte, n)
-			copy(data, buf[:n])
+		go func () {
 
-			data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
-
-			log.Printf("Sending data through WebRTC for ID(%d)\n", id)
-			exitDataChannel.Send(data)
-		}(id)
-
-		go func(id uint8, addr net.Addr) {
-
-			data, err := io.ReadAll(pipeArr[id].reader) // Read all data from the pipe to ensure it is consumed
-
+			buffer := make([]byte, 65507)
+			n, err = pipeReader.Read(buffer)
+			
+			if err != nil {
+				if err != io.EOF {
+					log.Printf("Error reading from pipe: %v", err)
+				}
+				return
+			}
+			
+			n, err = listener.WriteTo(buffer[:n], remoteAddr)
+			
 			if err != nil {
 				log.Println("Error writing data to connection:", err)
 			}
-
-			n, err := listener.WriteTo(data, addr)
-
-			log.Printf("Finished writing %d bytes to connection for ID(%d)\n", n, id)
-		}(id, addr)
+			
+			log.Printf("Finished writing %d bytes to connection\n", n)
+		}()
 
 	}
 }
@@ -136,19 +108,19 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 			go func(id uint8) {
 				log.Printf("Received end connection signal for ID(%d)\n", id)
 				time.Sleep(1 * time.Second) // Wait for 1 second before closing the pipe
-				pipeArr[id].writer.Close() // Close the writer to signal end of connection
+				pipeArr[id].writer.Close()  // Close the writer to signal end of connection
 			}(id)
 		}
 	}()
 
-	go func () {
+	go func() {
 		for data := range proxyChan {
-						
+
 			id := data[0]
 			log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
 			n, err := pipeArr[id].writer.Write(data[1:])
-		
+
 			if err != nil {
 				log.Printf("Error writing to pipe with ID(%d): %v\n", id, err)
 				continue
@@ -196,17 +168,14 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 
 				log.Printf("Read %d bytes from tcp connection for ID(%d)\n", n, id)
 
-				data := make([]byte, n)
-				copy(data, buf[:n])
-
-				data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
+				data := append([]byte{byte(id)}, buf[:n]...) // Prepend the ID to the data
 
 				log.Printf("Sending data through WebRTC for ID(%d)\n", id)
 				exitDataChannel.Send(data)
 			}
 		}()
 
-		go func() {	
+		go func() {
 			n, err := io.Copy(conn, pipeArr[id].reader) // Copy data from the pipe to the connection
 			if err != nil {
 				log.Println("Error writing data to connection:", err)
