@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"math"
@@ -87,9 +86,12 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 
 func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-chan uint8, exitDataChannel *webrtc.DataChannel) error {
 
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	addr := net.TCPAddr{
+		IP: net.ParseIP("127.0.0.1"),
+		Port: int(port),
+	}
 
-	listener, err := net.Listen("tcp", addr)
+	listener, err := net.ListenTCP("tcp", &addr)
 
 	if err != nil {
 		log.Println("Error starting listener:", err)
@@ -155,8 +157,8 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 		pipeCountMutex.Unlock()
 
 		go func() {
-			buf := make([]byte, 65507) // Maximum UDP packet size
 			for {
+				buf := make([]byte, 65507) // Maximum UDP packet size
 				n, err := conn.Read(buf)
 
 				if err != nil {
@@ -168,7 +170,7 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, endConnChan <-cha
 
 				log.Printf("Read %d bytes from tcp connection for ID(%d)\n", n, id)
 
-				data := append([]byte{byte(id)}, buf[:n]...) // Prepend the ID to the data
+				data := append([]byte{id}, buf[:n]...) // Prepend the ID to the data
 
 				log.Printf("Sending data through WebRTC for ID(%d)\n", id)
 				exitDataChannel.Send(data)
