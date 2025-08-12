@@ -17,13 +17,13 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - name: gamelinksafecli
+          - name: gamelinksafecli-linux
             platform: linux/amd64
             os: ubuntu-latest
           - name: gamelinksafecli.exe
             platform: windows/amd64
             os: windows-latest
-          - name: gamelinksafecli
+          - name: gamelinksafecli-macos
             platform: darwin/universal
             os: macos-latest
 
@@ -38,7 +38,7 @@ jobs:
           go-version: '1.24.2'
 
       - name: Build
-        run: go build .
+        run: go build . -o ${{ matrix.name }}
       
       - name: Upload release
         uses: softprops/action-gh-release@v1
