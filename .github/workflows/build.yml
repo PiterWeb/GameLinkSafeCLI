@@ -1,0 +1,52 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    tags:
+      - '*' # Ejecuta en cualquier nuevo tag
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: gamelinksafecli
+            platform: linux/amd64
+            os: ubuntu-latest
+          - name: gamelinksafecli.exe
+            platform: windows/amd64
+            os: windows-latest
+          - name: gamelinksafecli
+            platform: darwin/universal
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.2'
+
+      - name: Build
+        run: go build .
+      
+      - name: Upload release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            gamelinksafecli
+            gamelinksafecli.exe
+            
