@@ -11,6 +11,9 @@ It is like hamachi but simpler and more secure to use. No account required.
 
 This programm is a CLI, may not be easy for all users. There isn't a GUI implementation at the moment.
 
+You can use the software as it comes but if you are behind a strong firewall, a strict NAT or searching for more security you may want to have your own TURN server.
+If this is the case you can rent a TURN server or self-host it using [coturn](https://github.com/coturn/coturn)
+
 ## Download (Windows/Linux/Macos)
 
 https://github.com/PiterWeb/GameLinkSafeCLI/releases/latest
