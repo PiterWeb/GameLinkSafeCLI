@@ -7,7 +7,7 @@
 ## Introduction
 
 GameLinkSafeCLI is an Open Source project that aims to connect 2 machines through WebRTC and share ports.
-It is like hamachi but simpler and easier to use. No account required.
+It is like hamachi but simpler and more secure to use. No account required.
 
 This programm is a CLI, may not be easy for all users. There isn't a GUI implementation at the moment.
 
