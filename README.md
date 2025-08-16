@@ -42,6 +42,8 @@ By default GameLinkSafe uses a [dynamic public STUN server list](https://github.
 
 This is an example of use:
 ```yaml
+# file: servers.yml
+
 iceServers:
   # Public STUN servers
   - urls:
