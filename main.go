@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -19,6 +21,7 @@ const (
 
 func main() {
 
+	go handleInterrupt()
 	log.SetOutput(io.Discard)
 	
 	rolPtr := flag.String("role", "host", "Role of the application (host/client)")
@@ -94,4 +97,14 @@ func main() {
 		}
 	}
 
+}
+
+func handleInterrupt() {
+	stopChan := make(chan os.Signal, 2)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stopChan
+	close(stopChan)
+	fmt.Println("Stop (Ctr+C) detected: closing connection")
+	os.Exit(0)
 }
