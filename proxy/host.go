@@ -1,42 +1,71 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/pion/webrtc/v3"
 )
+
+func handleIncomingUDPPackets(conn net.Conn, connExists *atomic.Bool, exitDataChannel *webrtc.DataChannel) {
+	buf := make([]byte, 65507) // Maximum UDP packet size
+	for {
+		n, err := conn.Read(buf)
+		
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
+
+		if err != nil {
+			log.Println("Error reading from connection:", err)
+			if !errors.Is(err, net.ErrClosed) {
+				log.Printf("Closing connection")
+				conn.Close()
+			}
+			connExists.Store(false)
+			return
+		}
+
+		log.Printf("Read %d bytes from connection\n", n)
+		
+		log.Println("Sending data through webrtc:")
+		err = exitDataChannel.Send(buf[:n])
+		
+		if err != nil {
+			log.Println("Error sending data through webrtc:", err)
+		}
+
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
+	
+	}
+}
 
 func sendThroughHostUDP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	
-	localAddr := &net.UDPAddr{
+	dialer := net.Dialer{
+		LocalAddr: &net.UDPAddr{
 			IP:   net.ParseIP("127.0.0.1"),
 			Port: 0, // Setting port to 0 will make the OS choose a random available port
-	}
-	
-	dialer := net.Dialer{
-		LocalAddr: localAddr,
+		},
 	}
 	
 	network := "udp"
 
-	var netConnMapMutex sync.Mutex // Mutex to protect access to netConnMap
-	netConnMap := make(map[uint8]net.Conn, 1)
+	var conn net.Conn
+	connExists := new(atomic.Bool)
+	connExists.Store(false) 
 
 	for data := range proxyChan {
 
 		log.Printf("Received data from WebRTC with len: %d \n", len(data)-1)
 
-		netConnMapMutex.Lock() // Lock the map for safe concurrent access
-		conn, exists := netConnMap[0]
-		netConnMapMutex.Unlock() // Unlock the map after checking
-
-		if !exists {
+		if !connExists.Load() {
 			
 			var err error
 
@@ -44,63 +73,35 @@ func sendThroughHostUDP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 
 			if err != nil {
 				log.Println("Error connecting to host:", err)
-				log.Printf("Closing connection\n")
-				netConnMapMutex.Lock() // Lock the map for safe concurrent access
-				delete(netConnMap, 0) // Remove the connection from the map
-				netConnMapMutex.Unlock() // Unlock the map after deleting
 				continue
 			}
 
-			netConnMapMutex.Lock() // Lock the map for safe concurrent access
-			netConnMap[0] = conn // Store the connection in the map
-			netConnMapMutex.Unlock() // Unlock the map after storing
-
 			log.Printf("Established new connection\n")
 
+			// Only start reading from the connection if it doesn't already exist
+			// This prevents multiple goroutines from reading from the same connection
+			// and ensures that we only read once per connection
+			go handleIncomingUDPPackets(conn, connExists, exitDataChannel)
+
 		}
-	
-		// Only start reading from the connection if it doesn't already exist
-		// This prevents multiple goroutines from reading from the same connection
-		// and ensures that we only read once per connection
-		if !exists {
-			go func() {
-				buf := make([]byte, 65507) // Maximum UDP packet size
-				for {
-					n, err := conn.Read(buf)
-					
-					if err != nil {
-						log.Println("Error reading from connection:", err)
-						log.Printf("Closing connection")
-						netConnMapMutex.Lock() // Lock the map for safe concurrent access
-						delete(netConnMap, 0) // Remove the connection from the map
-						netConnMapMutex.Unlock() // Unlock the map after deleting
-						return
-					}
-					
-					log.Printf("Read %d bytes from connection\n", n)
-					
-					log.Println("Sending data through webrtc:")
-					err = exitDataChannel.Send(buf[:n])
-					
-					if err != nil {
-						log.Println("Error sending data through webrtc:", err)
-					}
-				
-				}
-			}()
-		}
+
+		connExists.Store(true)
+
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 
 		n, err := conn.Write(data)
 		if err != nil {
 			log.Println("Error writing data to connection:", err)
-			log.Printf("Closing connection\n")
-			netConnMapMutex.Lock() // Lock the map for safe concurrent access
-			delete(netConnMap, 0) // Remove the connection from the map
-			netConnMapMutex.Unlock() // Unlock the map after deleting
+			if !errors.Is(err, net.ErrClosed) {
+				log.Printf("Closing connection")
+				conn.Close()
+			}
 			continue
 		}
 		
 		log.Printf("Wrote %d bytes to connection\n", n)
+
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 		
 	}
 	
