@@ -6,6 +6,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/webrtc/v3"
@@ -26,12 +27,12 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	}
 
 	defer listener.Close()
-	var remoteAddr net.Addr
+	remoteAddr := atomic.Pointer[net.Addr]{}
 
 	go func() {
 		for data := range proxyChan {
 
-			n, err := listener.WriteTo(data, remoteAddr)
+			n, err := listener.WriteTo(data, *remoteAddr.Load())
 			
 			if err != nil {
 				log.Println("Error writing data to connection:", err)
@@ -45,8 +46,8 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	buf := make([]byte, 0, 65507) // Maximum UDP packet size
 	for {
 
-		var n int
-		n, remoteAddr, err = listener.ReadFrom(buf[:cap(buf)])
+		n, tempAddr, err := listener.ReadFrom(buf[:cap(buf)])
+		remoteAddr.Store(&tempAddr)
 
 		if err != nil {
 			log.Println("Error reading from connection:", err)
