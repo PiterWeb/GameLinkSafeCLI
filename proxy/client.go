@@ -26,60 +26,35 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	}
 
 	defer listener.Close()
-
-	pipeReader, pipeWriter := io.Pipe()
+	var remoteAddr net.Addr
 
 	go func() {
 		for data := range proxyChan {
 
-			log.Printf("Received data from WebRTC with len: %d \n", len(data))
-
-			n, err := pipeWriter.Write(data)
-
-			if err != nil {
-				log.Printf("Error writing to pipe: %v\n", err)
-				continue
-			}
-
-			log.Printf("Wrote %d bytes to pipe\n", n)
-
-		}
-	}()
-
-	for {
-		buf := make([]byte, 65507) // Maximum UDP packet size
-
-		n, remoteAddr, err := listener.ReadFrom(buf)
-
-		if err != nil {
-			log.Println("Error reading from connection:", err)
-			pipeWriter.Close()
-			continue
-		}
-
-		log.Printf("Read %d bytes from udp connection\n", n)
-		exitDataChannel.Send(buf[:n])
-
-		go func () {
-
-			buffer := make([]byte, 65507)
-			n, err = pipeReader.Read(buffer)
-			
-			if err != nil {
-				if err != io.EOF {
-					log.Printf("Error reading from pipe: %v", err)
-				}
-				return
-			}
-			
-			n, err = listener.WriteTo(buffer[:n], remoteAddr)
+			n, err := listener.WriteTo(data, remoteAddr)
 			
 			if err != nil {
 				log.Println("Error writing data to connection:", err)
 			}
 			
 			log.Printf("Finished writing %d bytes to connection\n", n)
-		}()
+
+		}
+	}()
+
+	buf := make([]byte, 0, 65507) // Maximum UDP packet size
+	for {
+
+		var n int
+		n, remoteAddr, err = listener.ReadFrom(buf[:cap(buf)])
+
+		if err != nil {
+			log.Println("Error reading from connection:", err)
+			continue
+		}
+
+		log.Printf("Read %d bytes from udp connection\n", n)
+		exitDataChannel.Send(buf[:n])
 
 	}
 }

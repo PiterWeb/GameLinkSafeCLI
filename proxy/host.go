@@ -14,9 +14,9 @@ import (
 )
 
 func handleIncomingUDPPackets(conn net.Conn, connExists *atomic.Bool, exitDataChannel *webrtc.DataChannel) {
-	buf := make([]byte, 65507) // Maximum UDP packet size
+	buf := make([]byte, 0, 65507) // Maximum UDP packet size
 	for {
-		n, err := conn.Read(buf)
+		n, err := conn.Read(buf[:cap(buf)])
 		
 		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 
@@ -63,7 +63,7 @@ func sendThroughHostUDP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 
 	for data := range proxyChan {
 
-		log.Printf("Received data from WebRTC with len: %d \n", len(data)-1)
+		log.Printf("Received data from WebRTC with len: %d \n", len(data))
 
 		if !connExists.Load() {
 			
@@ -83,9 +83,8 @@ func sendThroughHostUDP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 			// and ensures that we only read once per connection
 			go handleIncomingUDPPackets(conn, connExists, exitDataChannel)
 
+			connExists.Store(true)
 		}
-
-		connExists.Store(true)
 
 		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 
