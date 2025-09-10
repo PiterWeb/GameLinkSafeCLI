@@ -14,7 +14,14 @@ This programm is a CLI, may not be easy for all users. There isn't a GUI impleme
 You can use the software as it comes but if you are behind a strong firewall, a strict NAT or searching for more security you may want to have your own TURN server.
 If this is the case you can rent a TURN server or self-host it using [coturn](https://github.com/coturn/coturn)
 
-## Download (Windows/Linux/Macos)
+## Features
+
+- TCP/UDP support
+- No accounts
+- Plug & play config
+- Windows/Linux/MacOS support
+
+## Download (Windows/Linux/MacOS)
 
 https://github.com/PiterWeb/GameLinkSafeCLI/releases/latest
 
