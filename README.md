@@ -7,7 +7,7 @@
 ## Introduction
 
 GameLinkSafeCLI is an Open Source project that aims to connect 2 machines through WebRTC and share ports.
-It is like hamachi but simpler and more secure to use. No account required.
+It is an alternative to ngrok/hamachi with TCP/UDP support. No account required.
 
 This programm is a CLI, may not be easy for all users. There isn't a GUI implementation at the moment.
 
@@ -36,8 +36,12 @@ Client setup tcp tunnel on port 5000
 ```
 ./gamelinksafecli --role client --protocol tcp --port 5000
 ```
-The resulting connection works like this:<br>
-Host (8000) <-> Client(5000)
+
+Now it should appear some messages with instructions and connection codes.
+Finally copy and paste the generated codes between peers.
+
+The resulting connection will work like this:<br>
+Host (TCP 127.0.0.1:8000) <-> Client(TCP 127.0.0.1:5000)
 
 ## Advanced Config
 
