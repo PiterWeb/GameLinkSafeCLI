@@ -25,6 +25,10 @@ If this is the case you can rent a TURN server or self-host it using [coturn](ht
 
 https://github.com/PiterWeb/GameLinkSafeCLI/releases/latest
 
+## Download (Free but no open source Android APP)
+
+https://github.com/PiterWeb/GameLinkSafeCLI/releases/download/v1.1/gamelinksafenativeapp.apk
+
 ## Instructions
 
 Shows all commands with examples
