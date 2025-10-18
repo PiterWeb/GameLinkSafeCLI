@@ -9,7 +9,7 @@
 GameLinkSafeCLI is an Open Source project that aims to connect 2 machines through WebRTC and share ports.
 It is an alternative to ngrok/hamachi with TCP/UDP support. No account required.
 
-This programm is a CLI, may not be easy for all users. There isn't a GUI implementation at the moment.
+This programm is a CLI, may not be easy for all users. There is a pay-once [desktop GUI implementation](https://gamelinksafe.org/#pricing), it has no DRM and is compatible with GameLinkSafeCLI & GameLinkSafe for Android.
 
 You can use the software as it comes but if you are behind a strong firewall, a strict NAT or searching for more security you may want to have your own TURN server.
 If this is the case you can rent a TURN server or self-host it using [coturn](https://github.com/coturn/coturn)
