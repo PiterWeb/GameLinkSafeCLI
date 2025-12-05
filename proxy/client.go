@@ -47,7 +47,9 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	for {
 
 		n, tempAddr, err := listener.ReadFrom(buf[:cap(buf)])
-		remoteAddr.Store(&tempAddr)
+		if tempAddr.String() != (*remoteAddr.Load()).String() {
+			remoteAddr.Store(&tempAddr)
+		}
 
 		if err != nil {
 			log.Println("Error reading from connection:", err)
