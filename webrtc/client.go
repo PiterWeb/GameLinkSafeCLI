@@ -34,15 +34,10 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 		close(triggerEnd)
 	}()
 
-	endConnChan := make(chan uint8)
-
-	defer close(endConnChan)
-
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 
-		handleDataChannel(destinationPort, finalProtocol, endConnChan,d)
-		handleEndConnChannel(d, endConnChan)
+		handleDataChannel(destinationPort, finalProtocol, d)
 
 	})
 
@@ -118,12 +113,12 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 	}
 
 	// Block until error is received or the connection is closed
-	<-triggerEnd
+	err = <-triggerEnd
 
 	return nil
 }
 
-func handleDataChannel(destinationPort uint, finalProtocol uint, endConnChan <-chan uint8, d *webrtc.DataChannel) {
+func handleDataChannel(destinationPort uint, finalProtocol uint, d *webrtc.DataChannel) {
 
 	if d.Label() != "data" {
 		return
@@ -137,7 +132,7 @@ func handleDataChannel(destinationPort uint, finalProtocol uint, endConnChan <-c
 		case proxy.UDP:
 			_ = proxy.ServeThroughUDP(destinationPort, proxyChan, d)
 		case proxy.TCP:
-			_ = proxy.ServeThroughTCP(destinationPort, proxyChan, endConnChan, d)
+			_ = proxy.ServeThroughTCP(destinationPort, proxyChan, d)
 		}
 
 	})
@@ -146,18 +141,6 @@ func handleDataChannel(destinationPort uint, finalProtocol uint, endConnChan <-c
 
 		proxyChan <- msg.Data
 
-	})
-
-}
-
-func handleEndConnChannel(d *webrtc.DataChannel, endConnChan chan<- uint8) {
-
-	if d.Label() != "endConn" {
-		return
-	}
-
-	d.OnMessage(func(msg webrtc.DataChannelMessage) {
-		endConnChan <- msg.Data[0]
 	})
 
 }

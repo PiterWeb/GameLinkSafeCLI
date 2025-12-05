@@ -35,12 +35,6 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		close(triggerEnd)
 	}()
 
-	endConnChannel, err := peerConnection.CreateDataChannel("endConn", &webrtc.DataChannelInit{})
-
-	if err != nil {
-		return err
-	}
-
 	ordered := true
 
 	// If the protocol is UDP, we need to set the data channel to unordered
@@ -56,7 +50,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		return err
 	}
 
-	proxyChan := make(chan []byte)
+	proxyChan := make(chan []byte, 1024)
 	defer close(proxyChan)
 
 	// Open the data channel and select the protocol to send data
@@ -66,7 +60,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		case proxy.UDP:
 			_ = proxy.SendThroughUDP(port, proxyChan, dataChannel)
 		case proxy.TCP:
-			_ = proxy.SendThroughTCP(port, proxyChan, dataChannel, endConnChannel)
+			_ = proxy.SendThroughTCP(port, proxyChan, dataChannel)
 		}
 
 	})

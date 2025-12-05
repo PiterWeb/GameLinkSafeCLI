@@ -5,11 +5,11 @@ import (
 )
 
 // SendThroughTCP sends data through a TCP connection (used for host logic)
-func SendThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel, endConnChannel *webrtc.DataChannel) error {
-	return sendThroughHostTCP(port, proxyChan, exitDataChannel, endConnChannel)
+func SendThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
+	return sendThroughHostTCP(port, proxyChan, exitDataChannel)
 }
 
 // ServeThroughTCP serves as a TCP server (used for client logic)
-func ServeThroughTCP(port uint, proxyChan <-chan []byte, endConnChan <-chan uint8, exitDataChannel *webrtc.DataChannel) error {
-	return serveThroughClientTCP(port, proxyChan, endConnChan, exitDataChannel)
+func ServeThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
+	return serveThroughClientTCP(port, proxyChan, exitDataChannel)
 }
