@@ -123,8 +123,8 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 	
 	network := "tcp"
 
-	var netConnMapMutex sync.Mutex // Mutex to protect access to netConnMap
-	netConnMap := make(map[uint8]net.Conn, math.MaxUint8)
+	var netConnMapMutex sync.RWMutex // Mutex to protect access to netConnMap
+	netConnMap := make(map[byte]net.Conn, math.MaxUint8)
 
 	for data := range proxyChan {
 
@@ -132,9 +132,9 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 
 		log.Printf("Received data from WebRTC for ID(%d) with len: %d \n", id, len(data)-1)
 
-		netConnMapMutex.Lock() // Lock the map for safe concurrent access
+		netConnMapMutex.RLock() // Lock the map for safe concurrent access
 		conn, exists := netConnMap[id]
-		netConnMapMutex.Unlock() // Unlock the map after checking
+		netConnMapMutex.RUnlock() // Unlock the map after checking
 
 		if !exists {
 			
@@ -144,9 +144,6 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 			if err != nil {
 				log.Println("Error connecting to host:", err)
 				log.Printf("Closing connection for ID(%d)\n", id)
-				netConnMapMutex.Lock() // Lock the map for safe concurrent access
-				delete(netConnMap, id) // Remove the connection from the map
-				netConnMapMutex.Unlock() // Unlock the map after deleting
 				endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
 				continue
 			}
@@ -158,16 +155,18 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 			log.Printf("Established new connection for ID(%d)\n", id)
 
 		}
-	
+
+		_ = conn.SetDeadline(time.Now().Add(time.Second * 2))
+
 		// Only start reading from the connection if it doesn't already exist
 		// This prevents multiple goroutines from reading from the same connection
 		// and ensures that we only read once per connection
 		if !exists {
-			go func() {
+			go func(id byte, conn net.Conn) {
 				buf := make([]byte, 65507) // Maximum UDP packet size
 				for {
-					n, err := conn.Read(buf)
-					
+					n, err := conn.Read(buf[:cap(buf)])
+
 					if err != nil {
 						log.Println("Error reading from connection:", err)
 						log.Printf("Closing connection for ID(%d)", id)
@@ -175,17 +174,17 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 						delete(netConnMap, id) // Remove the connection from the map
 						netConnMapMutex.Unlock() // Unlock the map after deleting
 						endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+						_ = conn.Close()
 						return
 					}
 					
 					log.Printf("Read %d bytes from connection for ID(%d)\n", n, id)
 					
 					// Save buffered data to a new slice
-					data := make([]byte, n)
-					copy(data, buf[:n])
-					
-					data = append([]byte{byte(id)}, data...) // Prepend the ID to the data
-					
+					data := make([]byte, 1, n+1) // +1 for the ID
+					data[0] = id        // Prepend the ID to the data
+					data = append(data, buf[:n]...)   // Copy content of buf from position 1 to n+1
+
 					log.Println("Sending data through webrtc for ID:", id)
 					err = exitDataChannel.Send(data)
 					
@@ -194,7 +193,7 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 					}
 				
 				}
-			}()
+			}(id, conn)
 		}
 
 		n, err := conn.Write(data[1:]) // Write data excluding the ID byte
@@ -203,8 +202,9 @@ func sendThroughHostTCP(port uint, proxyChan <-chan []byte, exitDataChannel *web
 			log.Printf("Closing connection for ID(%d)\n", id)
 			netConnMapMutex.Lock() // Lock the map for safe concurrent access
 			delete(netConnMap, id) // Remove the connection from the map
-			netConnMapMutex.Unlock() // Unlock the map after deleting
-			endConnChannel.Send([]byte{uint8(id)}) // Notify end of connection
+			netConnMapMutex.Unlock()        // Unlock the map after deleting
+			endConnChannel.Send([]byte{id}) // Notify end of connection
+			_ = conn.Close()
 			continue
 		}
 		
