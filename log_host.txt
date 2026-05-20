@@ -1,0 +1,37 @@
+2026/05/20 21:55:25 Peer Connection State has changed: connecting
+2026/05/20 21:55:25 Peer Connection State has changed: connected
+2026/05/20 21:55:25 Established new connection
+2026/05/20 21:55:44 Established new connection
+2026/05/20 22:20:06 Peer Connection State has changed: connecting
+2026/05/20 22:20:06 Peer Connection State has changed: connected
+2026/05/20 22:20:06 Established new connection
+2026/05/20 22:20:16 Established new connection
+2026/05/20 22:21:42 Peer Connection State has changed: connecting
+2026/05/20 22:21:42 Peer Connection State has changed: connected
+2026/05/20 22:21:42 Established new connection
+2026/05/20 22:21:47 Established new connection
+2026/05/20 22:22:28 Established new connection
+2026/05/20 22:22:40 Established new connection
+2026/05/20 22:25:00 Peer Connection State has changed: connecting
+2026/05/20 22:25:00 Peer Connection State has changed: connected
+2026/05/20 22:25:00 Established new connection
+2026/05/20 22:25:20 Established new connection
+2026/05/20 22:29:47 Peer Connection State has changed: connecting
+2026/05/20 22:29:47 Peer Connection State has changed: connected
+2026/05/20 22:29:47 Established new connection
+2026/05/20 22:30:00 Established new connection
+2026/05/20 22:30:30 Established new connection
+2026/05/20 22:40:44 Peer Connection State has changed: connecting
+2026/05/20 22:40:44 Peer Connection State has changed: connected
+2026/05/20 22:40:44 Established new connection
+2026/05/20 22:40:52 Established new connection
+2026/05/20 22:41:51 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:52 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:53 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:54 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:55 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:56 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:57 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:58 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:41:59 Error connecting to host: dial tcp 127.0.0.1:0->127.0.0.1:8080: connect: connection refused
+2026/05/20 22:42:00 Established new connection

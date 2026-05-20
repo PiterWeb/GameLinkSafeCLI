@@ -6,12 +6,13 @@ import (
 	"gamelinksafecli/config"
 	"gamelinksafecli/proxy"
 	"gamelinksafecli/webrtc"
-	"io"
 	"io/fs"
 	"log"
 	"os"
 	"os/signal"
+	// "runtime"
 	"syscall"
+	// "time"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 func main() {
 
 	go handleInterrupt()
-	log.SetOutput(io.Discard)
+	log.SetOutput(os.Stderr)
 	
 	rolPtr := flag.String("role", "host", "Role of the application (host/client)")
 	portPtr := flag.Uint("port", defaultPort, "Port to listen on")

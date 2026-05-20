@@ -1,15 +1,15 @@
 package proxy
 
 import (
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/datachannel"
 )
 
 // SendThroughTCP sends data through a TCP connection (used for host logic)
-func SendThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
-	return sendThroughHostTCP(port, proxyChan, exitDataChannel)
+func SendThroughTCP(port uint, dataChannel datachannel.ReadWriteCloser) error {
+	return sendThroughHostTCP(port, dataChannel)
 }
 
 // ServeThroughTCP serves as a TCP server (used for client logic)
-func ServeThroughTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
-	return serveThroughClientTCP(port, proxyChan, exitDataChannel)
+func ServeThroughTCP(port uint, dataChannel datachannel.ReadWriteCloser) error {
+	return serveThroughClientTCP(port, dataChannel)
 }

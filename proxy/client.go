@@ -1,14 +1,15 @@
 package proxy
 
 import (
+	"context"
+	"io"
 	"log"
 	"net"
-	"sync/atomic"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/datachannel"
 )
 
-func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
+func serveThroughClientUDP(port uint, dataChannel datachannel.ReadWriteCloser) error {
 
 	addr := net.UDPAddr{
 		IP: net.ParseIP("127.0.0.1"),
@@ -23,42 +24,14 @@ func serveThroughClientUDP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	}
 
 	defer listener.Close()
-	remoteAddr := atomic.Pointer[net.Addr]{}
+	
+	go io.Copy(dataChannel, listener)
+	_, err = io.Copy(listener, dataChannel)
 
-	go func() {
-		for data := range proxyChan {
-
-			n, err := listener.WriteTo(data, *remoteAddr.Load())
-			
-			if err != nil {
-				log.Println("Error writing data to connection:", err)
-			}
-			
-			log.Printf("Finished writing %d bytes to connection\n", n)
-
-		}
-	}()
-
-	buf := make([]byte, 0, 65507) // Maximum UDP packet size
-	for {
-
-		n, tempAddr, err := listener.ReadFrom(buf[:cap(buf)])
-		if tempAddr.String() != (*remoteAddr.Load()).String() {
-			remoteAddr.Store(&tempAddr)
-		}
-
-		if err != nil {
-			log.Println("Error reading from connection:", err)
-			continue
-		}
-
-		log.Printf("Read %d bytes from udp connection\n", n)
-		exitDataChannel.Send(buf[:n])
-
-	}
+	return err
 }
 
-func serveThroughClientTCP(port uint, proxyChan <-chan []byte, exitDataChannel *webrtc.DataChannel) error {
+func serveThroughClientTCP(port uint, dataChannel datachannel.ReadWriteCloser) error {
 
 	addr := net.TCPAddr{
 		IP: net.ParseIP("127.0.0.1"),
@@ -73,50 +46,36 @@ func serveThroughClientTCP(port uint, proxyChan <-chan []byte, exitDataChannel *
 	}
 
 	defer listener.Close()
-	conn := atomic.Pointer[net.Conn]{}
-	
-	go func() {
-		for data := range proxyChan {
-			
-			n, err := (*conn.Load()).Write(data)
-			
-			if err != nil {
-				log.Println("Error writing data to connection:", err)
-			}
-			
-			log.Printf("Finished writing %d bytes to connection\n", n)
 
-		}
-	}()
+	// ctx, cancelCtx := context.WithCancel(context.Background()) 
 	
 	for {
-		_conn, err := listener.Accept()
+		conn, err := listener.Accept()
 		
 		if err != nil {
 			log.Println("Error accepting connection:", err)
 			continue
 		}
+
+		// cancelCtx()
+
+		ctx, cancelCtx := context.WithCancel(context.Background()) 
 		
-		oldConn := conn.Swap(&_conn)
-		
-		if oldConn != nil {
-			(*oldConn).Close()
-		}
-		
+		dataChannelR := NewReader(ctx, dataChannel)
+		dataChannelW := NewWriter(ctx, dataChannel)
+
 		go func() {
-			buf := make([]byte, 65507) // Maximum UDP packet size
-			for {
-				n, err := (*conn.Load()).Read(buf[:cap(buf)])
-
-				if err != nil {
-					log.Println("Error reading from connection:", err)
-					return
-				}
-
-				exitDataChannel.Send(buf[:n])
+			if _, err = io.Copy(dataChannelW, conn); err != nil {
+				cancelCtx()
 			}
 		}()
 		
+		go func() {
+			if _, err = io.Copy(conn, dataChannelR); err != nil {
+				cancelCtx()
+			}
+		}()
+
 	}
 
 }

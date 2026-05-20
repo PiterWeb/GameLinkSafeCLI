@@ -20,12 +20,17 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 	config := webrtc.Configuration{
 		ICEServers: defaultIceServers,
 	}
-	
+
 	if len(iceServers) > 0 {
 		config.ICEServers = iceServers
 	}
 	
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	s := webrtc.SettingEngine{}
+	s.DetachDataChannels()
+	
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+	
+	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		return err
 	}
@@ -50,24 +55,23 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		return err
 	}
 
-	proxyChan := make(chan []byte, 1024)
-	defer close(proxyChan)
-
 	// Open the data channel and select the protocol to send data
 	dataChannel.OnOpen(func() {
 
+		d, err := dataChannel.Detach()
+
+		if err != nil {
+			log.Printf("Error detach datachannel: %s", err)
+			return
+		}
+		
 		switch protocol {
 		case proxy.UDP:
-			_ = proxy.SendThroughUDP(port, proxyChan, dataChannel)
+			_ = proxy.SendThroughUDP(port, d)
 		case proxy.TCP:
-			_ = proxy.SendThroughTCP(port, proxyChan, dataChannel)
+			_ = proxy.SendThroughTCP(port, d)
 		}
 
-	})
-
-	// Listen for messages on the data channel to send to the proxy channel
-	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) { 
-		proxyChan <- msg.Data
 	})
 
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
