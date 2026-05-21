@@ -1,13 +1,17 @@
 package proxy
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/pion/datachannel"
+	"github.com/pion/webrtc/v3"
 )
 
 func sendThroughHostUDP(port uint, dataChannel datachannel.ReadWriteCloser) error {
@@ -32,7 +36,7 @@ func sendThroughHostUDP(port uint, dataChannel datachannel.ReadWriteCloser) erro
 			continue
 		}
 
-		log.Printf("Established new connection\n")
+		log.Println("Established new connection")
 		
 		go io.Copy(dataChannel, conn)
 		io.Copy(conn, dataChannel)
@@ -40,7 +44,7 @@ func sendThroughHostUDP(port uint, dataChannel datachannel.ReadWriteCloser) erro
 
 }
 
-func sendThroughHostTCP(port uint, dataChannel datachannel.ReadWriteCloser) error {
+func sendThroughHostTCP(port uint, peerConnection *webrtc.PeerConnection) {
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
@@ -54,22 +58,39 @@ func sendThroughHostTCP(port uint, dataChannel datachannel.ReadWriteCloser) erro
 	}
 
 	const network = "tcp"
-	
-	for {
+
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+
+		if !strings.Contains(d.Label(), "tcp") {
+			return
+		} 
 		
-		conn, err := dialer.Dial(network, addr)
+		d.OnOpen(func() {
 
-		if err != nil {
-			log.Println("Error connecting to host:", err)
-			time.Sleep(time.Second)
-			continue
-		}
+			dataChannel, err := d.Detach()
 
-		log.Printf("Established new connection\n")
+			if err != nil {
+				log.Println("Error detach datachannel: ", err)
+				return
+			}
 
-		go io.Copy(dataChannel, conn)
-		
-		io.Copy(conn, dataChannel)
-	}
+			defer dataChannel.Close()
+			
+			conn, err := dialer.Dial(network, addr)
 
+			if err != nil {
+				log.Println("Error connecting to host, closing datachannel:", err)
+				return
+			}
+
+			conn.SetDeadline(time.Now().Add(time.Minute))
+			
+			defer conn.Close()
+			
+			log.Println("Established new connection")
+			
+			go io.Copy(dataChannel, bufio.NewReader(conn))
+			io.Copy(conn, bufio.NewReader(dataChannel))
+		})
+	})
 }

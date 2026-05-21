@@ -1,12 +1,16 @@
 package proxy
 
 import (
-	"context"
+	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"sync/atomic"
+	"time"
 
 	"github.com/pion/datachannel"
+	"github.com/pion/webrtc/v3"
 )
 
 func serveThroughClientUDP(port uint, dataChannel datachannel.ReadWriteCloser) error {
@@ -31,7 +35,7 @@ func serveThroughClientUDP(port uint, dataChannel datachannel.ReadWriteCloser) e
 	return err
 }
 
-func serveThroughClientTCP(port uint, dataChannel datachannel.ReadWriteCloser) error {
+func serveThroughClientTCP(port uint, peerConnection *webrtc.PeerConnection) error {
 
 	addr := net.TCPAddr{
 		IP: net.ParseIP("127.0.0.1"),
@@ -47,35 +51,45 @@ func serveThroughClientTCP(port uint, dataChannel datachannel.ReadWriteCloser) e
 
 	defer listener.Close()
 
-	// ctx, cancelCtx := context.WithCancel(context.Background()) 
+	var connCounter atomic.Uint64
+	
+	ordered := true
 	
 	for {
 		conn, err := listener.Accept()
 		
 		if err != nil {
-			log.Println("Error accepting connection:", err)
+			log.Println("Error accepting connection: ", err)
 			continue
 		}
 
-		// cancelCtx()
-
-		ctx, cancelCtx := context.WithCancel(context.Background()) 
+		conn.SetDeadline(time.Now().Add(time.Minute))
 		
-		dataChannelR := NewReader(ctx, dataChannel)
-		dataChannelW := NewWriter(ctx, dataChannel)
+		datachannel, err := peerConnection.CreateDataChannel(fmt.Sprintf("tcp%d", connCounter.Add(1)), &webrtc.DataChannelInit{
+			Ordered: &ordered,
+		})
 
-		go func() {
-			if _, err = io.Copy(dataChannelW, conn); err != nil {
-				cancelCtx()
-			}
-		}()
-		
-		go func() {
-			if _, err = io.Copy(conn, dataChannelR); err != nil {
-				cancelCtx()
-			}
-		}()
+		if err != nil {
+			log.Println("Error creating datachannel: ", err)
+			conn.Close()
+			return err
+		}
 
+		datachannel.OnOpen(func() {
+			defer conn.Close()
+			defer datachannel.Close()
+			
+			d, err := datachannel.Detach()
+
+			if err != nil {
+				log.Println("Error detach datachannel: ", err)
+				return
+			}
+			
+			go io.Copy(d, bufio.NewReader(conn))
+			io.Copy(conn, bufio.NewReader(d))
+
+		})
 	}
 
 }
