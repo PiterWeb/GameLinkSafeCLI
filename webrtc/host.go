@@ -27,6 +27,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 	
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
+	s.EnableSCTPZeroChecksum(true)
 	
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	
@@ -40,39 +41,28 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		close(triggerEnd)
 	}()
 
-	ordered := true
+	peerConnection.CreateDataChannel("init", nil)
+	
+	switch protocol {
+	case proxy.UDP:
+		peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 
-	// If the protocol is UDP, we need to set the data channel to unordered
-	if protocol == proxy.UDP {
-		ordered = false
+			if d.Label() != "udp" {
+				return
+			}
+			
+			dataChannel, err := d.Detach()
+
+			if err != nil {
+				log.Println("Error detach datachannel")
+				return
+			}
+			
+			_ = proxy.SendThroughUDP(port, dataChannel)
+		})
+	case proxy.TCP:
+		proxy.SendThroughTCP(port, peerConnection)
 	}
-
-	dataChannel, err := peerConnection.CreateDataChannel("data", &webrtc.DataChannelInit{
-		Ordered: &ordered,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	// Open the data channel and select the protocol to send data
-	dataChannel.OnOpen(func() {
-
-		d, err := dataChannel.Detach()
-
-		if err != nil {
-			log.Printf("Error detach datachannel: %s", err)
-			return
-		}
-		
-		switch protocol {
-		case proxy.UDP:
-			_ = proxy.SendThroughUDP(port, d)
-		case proxy.TCP:
-			_ = proxy.SendThroughTCP(port, d)
-		}
-
-	})
 
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 

@@ -26,6 +26,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
+	s.EnableSCTPZeroChecksum(true)
 	
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	
@@ -38,13 +39,30 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 		peerConnection.Close()
 		close(triggerEnd)
 	}()
+	
+	switch finalProtocol {
+	case proxy.UDP:
+		ordered := false
+		d, err := peerConnection.CreateDataChannel("udp", &webrtc.DataChannelInit{
+			Ordered: &ordered,
+		})
 
-	// Register data channel creation handling
-	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		if err == nil {
+			d.OnOpen(func() {
+		
+				dataCh, err := d.Detach()
+		
+				if err != nil {
+					log.Println("Error detach datachannel: ", err)
+					return
+				}
 
-		handleDataChannel(destinationPort, finalProtocol, d)
-
-	})
+				proxy.ServeThroughUDP(destinationPort, dataCh)
+			})
+		}
+	case proxy.TCP:
+		go proxy.ServeThroughTCP(destinationPort, peerConnection)
+	}
 
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 
@@ -55,7 +73,6 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 		}
 
 		candidates = append(candidates, (*c).ToJSON())
-
 	})
 
 	// Set the handler for Peer connection state
@@ -121,30 +138,4 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 	err = <-triggerEnd
 
 	return nil
-}
-
-func handleDataChannel(destinationPort uint, finalProtocol uint, d *webrtc.DataChannel) {
-
-	if d.Label() != "data" {
-		return
-	}
-
-	d.OnOpen(func() {
-
-		dataCh, err := d.Detach()
-
-		if err != nil {
-			log.Printf("Error detach datachannel: %s", err)
-			return
-		}
-		
-		switch finalProtocol {
-		case proxy.UDP:
-			_ = proxy.ServeThroughUDP(destinationPort, dataCh)
-		case proxy.TCP:
-			_ = proxy.ServeThroughTCP(destinationPort, dataCh)
-		}
-
-	})
-
 }
