@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
@@ -24,13 +24,13 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 	if len(iceServers) > 0 {
 		config.ICEServers = iceServers
 	}
-	
+
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.EnableSCTPZeroChecksum(true)
 	
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
-	
+
 	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 	}()
 
 	peerConnection.CreateDataChannel("init", nil)
-	
+
 	switch protocol {
 	case proxy.UDP:
 		peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
@@ -50,14 +50,14 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 			if d.Label() != "udp" {
 				return
 			}
-			
+
 			dataChannel, err := d.Detach()
 
 			if err != nil {
 				log.Println("Error detach datachannel")
 				return
 			}
-			
+
 			_ = proxy.SendThroughUDP(port, dataChannel)
 		})
 	case proxy.TCP:
@@ -85,7 +85,7 @@ func HostWebrtc(port uint, protocol uint, iceServers []webrtc.ICEServer) error {
 		if s == webrtc.PeerConnectionStateConnected {
 			fmt.Println("--- Connection stablished successfully ---")
 		}
-		
+
 		if s == webrtc.PeerConnectionStateFailed {
 
 			peerConnection.Close()

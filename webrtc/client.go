@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.ICEServer) error {
@@ -27,9 +27,9 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.EnableSCTPZeroChecksum(true)
-	
+
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
-	
+
 	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 		peerConnection.Close()
 		close(triggerEnd)
 	}()
-	
+
 	switch finalProtocol {
 	case proxy.UDP:
 		ordered := false
@@ -49,9 +49,9 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 
 		if err == nil {
 			d.OnOpen(func() {
-		
+
 				dataCh, err := d.Detach()
-		
+
 				if err != nil {
 					log.Println("Error detach datachannel: ", err)
 					return
@@ -83,7 +83,7 @@ func ClientWebrtc(destinationPort uint, finalProtocol uint, iceServers []webrtc.
 		if s == webrtc.PeerConnectionStateConnected {
 			fmt.Println("--- Connection stablished successfully ---")
 		}
-		
+
 		if s == webrtc.PeerConnectionStateFailed {
 
 			peerConnection.Close()

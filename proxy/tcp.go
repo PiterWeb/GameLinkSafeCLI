@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 // SendThroughTCP sends data through a TCP connection (used for host logic)

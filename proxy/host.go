@@ -7,10 +7,11 @@ import (
 	"log"
 	"net"
 	"strings"
-	"time"
+	"sync"
+	// "time"
 
 	"github.com/pion/datachannel"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 func sendThroughHostUDP(port uint, dataChannel datachannel.ReadWriteCloser) error {
@@ -66,6 +67,8 @@ func sendThroughHostTCP(port uint, peerConnection *webrtc.PeerConnection) {
 		
 		d.OnOpen(func() {
 
+			defer d.Close()
+				
 			dataChannel, err := d.Detach()
 
 			if err != nil {
@@ -82,14 +85,28 @@ func sendThroughHostTCP(port uint, peerConnection *webrtc.PeerConnection) {
 				return
 			}
 
-			conn.SetDeadline(time.Now().Add(time.Minute))
+			// conn.SetDeadline(time.Now().Add(time.Minute))
 			
 			defer conn.Close()
-			
+
 			log.Println("Established new connection")
 			
-			go io.Copy(dataChannel, bufio.NewReader(conn))
-			io.Copy(conn, bufio.NewReader(dataChannel))
+			var wg sync.WaitGroup
+    		wg.Add(2)
+
+		    go func() {
+		        defer wg.Done()
+		        io.Copy(dataChannel, bufio.NewReader(conn))
+				d.Close()
+		        dataChannel.Close()
+		    }()
+		    go func() {
+		        defer wg.Done()
+		        io.Copy(conn, bufio.NewReader(dataChannel))
+		        conn.Close()
+		    }()
+
+			wg.Wait()	
 		})
 	})
 }

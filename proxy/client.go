@@ -6,11 +6,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"sync/atomic"
-	"time"
+	// "time"
 
 	"github.com/pion/datachannel"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 func serveThroughClientUDP(port uint, dataChannel datachannel.ReadWriteCloser) error {
@@ -63,9 +64,9 @@ func serveThroughClientTCP(port uint, peerConnection *webrtc.PeerConnection) err
 			continue
 		}
 
-		conn.SetDeadline(time.Now().Add(time.Minute))
+		// conn.SetDeadline(time.Now().Add(time.Minute))
 		
-		datachannel, err := peerConnection.CreateDataChannel(fmt.Sprintf("tcp%d", connCounter.Add(1)), &webrtc.DataChannelInit{
+		d, err := peerConnection.CreateDataChannel(fmt.Sprintf("tcp%d", connCounter.Add(1)), &webrtc.DataChannelInit{
 			Ordered: &ordered,
 		})
 
@@ -75,19 +76,37 @@ func serveThroughClientTCP(port uint, peerConnection *webrtc.PeerConnection) err
 			return err
 		}
 
-		datachannel.OnOpen(func() {
+		d.OnOpen(func() {
 			defer conn.Close()
-			defer datachannel.Close()
+			defer d.Close()
 			
-			d, err := datachannel.Detach()
+			dataChannel, err := d.Detach()
 
 			if err != nil {
 				log.Println("Error detach datachannel: ", err)
 				return
 			}
+
+			defer dataChannel.Close()
 			
-			go io.Copy(d, bufio.NewReader(conn))
-			io.Copy(conn, bufio.NewReader(d))
+			log.Println("Established new connection")
+			
+			var wg sync.WaitGroup
+    		wg.Add(2)
+
+		    go func() {
+		        defer wg.Done()
+		        io.Copy(dataChannel, bufio.NewReader(conn))
+		        d.Close()
+				dataChannel.Close()
+		    }()
+		    go func() {
+		        defer wg.Done()
+		        io.Copy(conn, bufio.NewReader(dataChannel))
+		        conn.Close()
+		    }()
+
+			wg.Wait()	
 
 		})
 	}
